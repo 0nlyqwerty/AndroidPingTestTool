@@ -9,6 +9,8 @@ import android.widget.EditText;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
+    int a=0;
+
     //
     EditText input_ip;
     EditText input_repeats;
