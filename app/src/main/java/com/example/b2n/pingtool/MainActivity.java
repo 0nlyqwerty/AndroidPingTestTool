@@ -410,6 +410,7 @@ public class MainActivity extends AppCompatActivity {
 // 180921_123202
 // Have to implement close keyboard function -> finish. have to apply
 // Have to implement EmptyCheck function -> finish. have to apply
+// Have to add detail debug log like Log.e
 
 // Have to check request permission
 
