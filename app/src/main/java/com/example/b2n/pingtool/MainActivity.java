@@ -14,8 +14,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -56,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
     Button startBtn;
 
     TextView showLog;
+    Switch swRun;
 
     SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
@@ -165,6 +168,17 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
+
+        swRun = (Switch) findViewById(R.id.swRun);
+        swRun.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked)
+                    Toast.makeText(MainActivity.this, "Check", Toast.LENGTH_SHORT).show();
+                else
+                    Toast.makeText(MainActivity.this, "Not Check", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     //PING
