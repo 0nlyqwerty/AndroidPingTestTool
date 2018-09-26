@@ -39,8 +39,9 @@ public class MainActivity extends AppCompatActivity {
     StringBuffer sbWritePingLog = new StringBuffer();
 
     Boolean isTestRunning = Boolean.valueOf(false);
+    Boolean pingTestEnd = false;
 
-    Handler handler = new PingHandle();
+    Handler handler = new Handle();
 
     ScrollView mLogScrollView = null;
 
@@ -58,14 +59,17 @@ public class MainActivity extends AppCompatActivity {
 
     SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
-    class PingHandle extends Handler {
+    class Handle extends Handler {
         public void handleMessage(Message msg){
             if (msg.what == 1){
                 if(false)   // @@ about progress bar
                     isTestRunning = Boolean.valueOf(false);
             }
-            if ((msg.what == 2 || msg.what == 3 ) && showLog != null){
+            if ((msg.what == 2 ) && showLog != null){   // print log at (TextView) showLog
                 showLog.setText(msg.getData().getString("result"));
+            }
+            if (msg.what == 3 ){    // first, data from results(status)
+                Toast.makeText(MainActivity.this, "msg.what is 3 ! :) ",Toast.LENGTH_LONG).show();
             }
 
             // @@
@@ -170,7 +174,6 @@ public class MainActivity extends AppCompatActivity {
         int lineNumber = 0;
         this.isTestRunning = Boolean.valueOf(true);
         boolean isSuccess;
-        Message msg1;
 
         String cmd = "ping -c " + repeats + " " + "-i" + " " + interval
                 + " " + "-s" + " " + size + " " + ip;
@@ -182,41 +185,47 @@ public class MainActivity extends AppCompatActivity {
 
         BufferedReader pingReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
+        this.pingTestEnd = false;
 
-        while ((line = pingReader.readLine()) != null) {
+        while (!(this.pingTestEnd)) {
+            line = pingReader.readLine();
             lineNumber++;
-            if(lineNumber < 2 || lineNumber > repeats + 1){
-                append(stringBuffer, "● "+line);
-            } else{
-                append(stringBuffer, "[" + this.simpleDateFormat.format(new Date(System.currentTimeMillis())) + "]" + "\n" + line);
-            }
+            if(line == null)
+                this.pingTestEnd = true;
 
-            bundlePingResult.putString("result", stringBuffer.toString());
+            if(!(this.pingTestEnd)){
+                if(lineNumber < 2 || lineNumber > repeats + 1){
+                    append(stringBuffer, "● "+line);
+                } else{
+                    append(stringBuffer, "[" + this.simpleDateFormat.format(new Date(System.currentTimeMillis())) + "]" + "\n" + line);
+                }
 
-            if (this.handler != null) {
+                bundlePingResult.putString("result", stringBuffer.toString());
+
+                if (this.handler != null) {
+                    Message msg2 = this.handler.obtainMessage();
+                    msg2.what = 2;
+                    msg2.setData(bundlePingResult);
+                    this.handler.sendMessage(msg2);
+                }
+            }else if (this.pingTestEnd){
+                int resultStatus = process.waitFor(); // process.waitFor 기능
+                if (resultStatus == 0) {
+                    append(stringBuffer, "exec cmd success! cmd : " + cmd);
+                    isSuccess = true;
+                } else {
+                    append(stringBuffer, "exec cmd fail... resultStatus : " + resultStatus);
+                    isSuccess = false;
+                }
+                append(stringBuffer, "\n//////// Ping Test END ////////");
+
+                bundlePingResult.putString("result", stringBuffer.toString());
                 Message msg2 = this.handler.obtainMessage();
                 msg2.what = 2;
                 msg2.setData(bundlePingResult);
                 this.handler.sendMessage(msg2);
             }
         }
-
-        int resultStatus = process.waitFor(); // process.waitFor 기능
-        if (resultStatus == 0) {
-            append(stringBuffer, "exec cmd success! cmd : " + cmd);
-            isSuccess = true;
-        } else {
-            append(stringBuffer, "exec cmd fail... resultStatus : " + resultStatus);
-            isSuccess = false;
-        }
-        append(stringBuffer, "\n//////// Ping Test END ////////");
-
-        //below stringBuffer is above resultStatus and Ping test END string
-        bundlePingResult.putString("result", stringBuffer.toString());
-        msg1 = this.handler.obtainMessage();
-        msg1.what = 3;
-        msg1.setData(bundlePingResult);
-        this.handler.sendMessage(msg1);
 
         if (process != null) {
             process.destroy();
@@ -228,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
         // test END
         this.isTestRunning = Boolean.valueOf(false);
         enabledEditText(true);
-        return isSuccess;
+        return true;    //have to check. it have to return "isSuccess"
     }
 
     public void onResume() {
@@ -354,18 +363,18 @@ public class MainActivity extends AppCompatActivity {
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        //Action for 'yes' button
-                        if(getTtoS(mname_edit).equals("") || mname_edit.length() <= 4
-                                || !getTtoS(mname_edit).substring(mname_edit.length() - 4, mname_edit.length()).equals(".txt")) {
-                            mname_edit.setText(mOldName);
-                            Toast.makeText(MainActivity.this, "There is no file name\nor\nDoesn't include .txt at end of file name", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        stringFileNewName = mname_edit.getText().toString();
-                        writeTxtToFile(showLog.getText().toString(), logSavePath, stringFileNewName);
-                        Toast.makeText(MainActivity.this, "LOG : " + logSavePath + stringFileNewName, Toast.LENGTH_LONG).show();
-                    }
-                }).setNegativeButton("NO", new dialogDismiss()).show();
+                //Action for 'yes' button
+                if(getTtoS(mname_edit).equals("") || mname_edit.length() <= 4
+                        || !getTtoS(mname_edit).substring(mname_edit.length() - 4, mname_edit.length()).equals(".txt")) {
+                    mname_edit.setText(mOldName);
+                    Toast.makeText(MainActivity.this, "There is no file name\nor\nDoesn't include .txt at end of file name", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                stringFileNewName = mname_edit.getText().toString();
+                writeTxtToFile(showLog.getText().toString(), logSavePath, stringFileNewName);
+                Toast.makeText(MainActivity.this, "LOG : " + logSavePath + stringFileNewName, Toast.LENGTH_LONG).show();
+            }
+        }).setNegativeButton("NO", new dialogDismiss()).show();
     }
 
     // convert EditText's texts
@@ -385,7 +394,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     // clear showLog and buffer
     class clearLogBuf implements DialogInterface.OnClickListener{
         @Override
@@ -393,6 +401,7 @@ public class MainActivity extends AppCompatActivity {
             clearLogAndBuffer(showLog, sbWritePingLog);
         }
     }
+
     public void clearLogAndBuffer(TextView tv, StringBuffer stringBuffer){
         if(tv != null)
             tv.setText("");
