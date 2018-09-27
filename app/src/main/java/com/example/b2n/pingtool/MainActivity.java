@@ -3,6 +3,8 @@ package com.example.b2n.pingtool;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
@@ -22,6 +24,8 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.administrator.pingtestingtool.R;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -32,7 +36,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import static android.view.View.*;
-
 public class MainActivity extends AppCompatActivity {
     String TAG = "APTT";
     String stringFileNewName;
@@ -47,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
 
     ScrollView mLogScrollView = null;
 
-    // declare
+    // OBJECT 선언
     EditText editIp;
     EditText editRepeats;
     EditText editInterval;
@@ -65,14 +68,14 @@ public class MainActivity extends AppCompatActivity {
     class Handle extends Handler {
         public void handleMessage(Message msg){
             if (msg.what == 1){
-                if(false)   // @@ about progress bar
-                    isTestRunning = Boolean.valueOf(false);
+
             }
-            if ((msg.what == 2 ) && showLog != null){   // print log at (TextView) showLog
+            if ((msg.what == 2) && showLog != null){
                 showLog.setText(msg.getData().getString("result"));
+
             }
-            if (msg.what == 3 ){    // first, data from results(status)
-                Toast.makeText(MainActivity.this, "msg.what is 3 ! :) ",Toast.LENGTH_LONG).show();
+            if (msg.what == 3){
+                Toast.makeText(MainActivity.this, "msg.what is 3", Toast.LENGTH_LONG).show();
             }
 
             // @@
@@ -82,12 +85,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Run Ping Thread (runnable)
     class RunPing implements Runnable{
         @Override
         public void run() {
             try {
-                ping(getTtoS(editIp), getTtoI(editRepeats), getTtoI(editInterval), getTtoI(editSize), sbWritePingLog);
+                enabledEditText(false);
+                ping(Util.getTtoS(editIp), Util.getTtoI(editRepeats), Util.getTtoI(editInterval), Util.getTtoI(editSize), sbWritePingLog);
+                enabledEditText(true);
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (InterruptedException e) {
@@ -98,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // saveLog
+    // @@ have to implement LOGSAVE
     public void saveLog(){
         if(!isTestRunning){
             if("".equals(showLog.getText().toString()) || showLog == null){
@@ -107,13 +111,13 @@ public class MainActivity extends AppCompatActivity {
             }
 
             SimpleDateFormat SDF = new SimpleDateFormat("yyyyMMdd_HHmmss");
-            stringFileNewName = getDeviceBrand() + "_" + getSystemModel() + "_"
-                    + getSystemVersion() + "_" + SDF.format(new Date(System.currentTimeMillis())) + "_Log.txt";
+            stringFileNewName = Util.getDeviceBrand() + "_" + Util.getSystemModel() + "_"
+                    + Util.getSystemVersion() + "_" + SDF.format(new Date(System.currentTimeMillis())) + "_Log.txt";
             renameAndSaveLog(stringFileNewName);
         }
     }
 
-    // clearLog
+    // @@ have to implement LOGCLEAR
     public void clearLog(){
         if(!(isTestRunning.booleanValue()) && (showLog != null)){
             AlertDialog.Builder noticeAlert = new AlertDialog.Builder(this);
@@ -131,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // OBJECT init
+        // OBJECT 초기화
         editIp = (EditText) findViewById(R.id.editIp);
         editRepeats = (EditText) findViewById(R.id.editRepeats);
         editInterval = (EditText) findViewById(R.id.editInterval);
@@ -168,26 +172,29 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
-
         swRun = (Switch) findViewById(R.id.swRun);
-        swRun.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+        swRun.setBackgroundColor(Color.RED);
+        swRun.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if(isChecked)
-                    Toast.makeText(MainActivity.this, "Check", Toast.LENGTH_SHORT).show();
-                else
-                    Toast.makeText(MainActivity.this, "Not Check", Toast.LENGTH_SHORT).show();
+                if(isChecked){
+                    // start service code
+                    StartService();
+                }
+                else{
+                    // stop service code
+                    StopService();
+                }
             }
         });
     }
 
     //PING
-    public boolean ping(String ip, int repeats, int interval, int size, StringBuffer stringBuffer) throws IOException, InterruptedException {
-
-        enabledEditText(false);
+    public void ping(String ip, int repeats, int interval, int size, StringBuffer stringBuffer) throws IOException, InterruptedException {
         int lineNumber = 0;
         this.isTestRunning = Boolean.valueOf(true);
         boolean isSuccess;
+        Message msg1;   // handler 한테 보내줄때 쓸 msg3
 
         String cmd = "ping -c " + repeats + " " + "-i" + " " + interval
                 + " " + "-s" + " " + size + " " + ip;
@@ -195,7 +202,7 @@ public class MainActivity extends AppCompatActivity {
         Bundle bundlePingResult = new Bundle();
 
         Process process = Runtime.getRuntime().exec(cmd);
-        append(stringBuffer, "//////// Ping Test START ////////");
+        Util.append(stringBuffer, "//////// Ping Test START ////////");
 
         BufferedReader pingReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
@@ -207,31 +214,30 @@ public class MainActivity extends AppCompatActivity {
             if(line == null)
                 this.pingTestEnd = true;
 
-            if(!(this.pingTestEnd)){
+            if(!(this.pingTestEnd)){   //testing
                 if(lineNumber < 2 || lineNumber > repeats + 1){
-                    append(stringBuffer, "● "+line);
+                    Util.append(stringBuffer, "● "+line);
                 } else{
-                    append(stringBuffer, "[" + this.simpleDateFormat.format(new Date(System.currentTimeMillis())) + "]" + "\n" + line);
+                    Util.append(stringBuffer, "[" + this.simpleDateFormat.format(new Date(System.currentTimeMillis())) + "]" + "\n" + line);
                 }
 
                 bundlePingResult.putString("result", stringBuffer.toString());
-
                 if (this.handler != null) {
                     Message msg2 = this.handler.obtainMessage();
                     msg2.what = 2;
                     msg2.setData(bundlePingResult);
                     this.handler.sendMessage(msg2);
                 }
-            }else if (this.pingTestEnd){
-                int resultStatus = process.waitFor(); // process.waitFor 기능
+            }else if(this.pingTestEnd){ // test end
+                int resultStatus = process.waitFor(); // process.waitFor
                 if (resultStatus == 0) {
-                    append(stringBuffer, "exec cmd success! cmd : " + cmd);
-                    isSuccess = true;
+                    Util.append(stringBuffer, "exec cmd success! cmd : " + cmd);
+                    isSuccess = true;   // @@ have to check
                 } else {
-                    append(stringBuffer, "exec cmd fail... resultStatus : " + resultStatus);
-                    isSuccess = false;
+                    Util.append(stringBuffer, "exec cmd fail... resultStatus : " + resultStatus);
+                    isSuccess = false;  // @@ have to check
                 }
-                append(stringBuffer, "\n//////// Ping Test END ////////");
+                Util.append(stringBuffer, "\n//////// Ping Test END ////////");
 
                 bundlePingResult.putString("result", stringBuffer.toString());
                 Message msg2 = this.handler.obtainMessage();
@@ -248,105 +254,17 @@ public class MainActivity extends AppCompatActivity {
             pingReader.close();
         }
 
-        // test END
+        Message msg4 = this.handler.obtainMessage();
+        msg4.what = 4;
+        this.handler.sendMessage(msg4);
+
+        // 테스트 종료
         this.isTestRunning = Boolean.valueOf(false);
-        enabledEditText(true);
-        return true;    //have to check. it have to return "isSuccess"
     }
 
     public void onResume() {
         super.onResume();
-        closeKeyboard(this.editInterval, this);
-    }
-
-    // close key board
-    public static void closeKeyboard(EditText mEditText, Context mContext){
-        ((InputMethodManager) mContext.getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(mEditText.getWindowToken(),0);
-    }
-
-    // EditText Empty Check function
-    public static boolean checkEmpty(EditText mEditText){
-        if("".equals(mEditText.getText().toString()) || mEditText == null)
-            return true;
-        else
-            return false;
-    }
-
-    // append
-    private static void append(StringBuffer stringBuffer, String text){
-        if (stringBuffer != null){
-            stringBuffer.append(new StringBuffer(String.valueOf(text)).append("\n").toString());
-        }
-    }
-
-    // write Txt To File
-    public void writeTxtToFile(String strcontent, String filePath, String fileName){
-        String strContent = new StringBuilder(String.valueOf(strcontent)).append("\r\n").toString();
-        try{
-            File file = makeFilePath(filePath, fileName);
-            if(!file.exists()){
-                file.getParentFile().mkdirs();
-                file.createNewFile();
-                Toast.makeText(MainActivity.this, "aa ", Toast.LENGTH_LONG).show();
-            }
-            RandomAccessFile raf = new RandomAccessFile(file, "rwd");
-            raf.seek(file.length());
-            raf.write(strContent.getBytes());
-            raf.close();
-        } catch (Exception e) {
-            Log.e(TAG, "Error on write File : " + e);
-        }
-    }
-
-    // make File path
-    public File makeFilePath(String filePath, String fileName){
-        Exception e;
-        File file = null;
-        makeRootDir(filePath);
-        try {
-            File file2 = new File(new StringBuilder(String.valueOf(filePath)).append(fileName).toString());
-            try {
-                if (file2.exists()) {
-                    Toast.makeText(MainActivity.this, "AA ", Toast.LENGTH_LONG).show();
-                    return file2;
-                }
-                file2.createNewFile();
-                return file2;
-            } catch (Exception e2) {
-                e = e2;
-                file = file2;
-                //Create file error
-                e.printStackTrace();
-                return file;
-            }
-        } catch (Exception e3) {
-            e = e3;
-            //Create file error
-            e.printStackTrace();
-            return file;
-        }
-    }
-
-    // make Root Directory
-    public void makeRootDir(String filePath){
-        Exception e;
-        try {
-            File file = new File(filePath);
-            try {
-                if (file.exists()) {
-                    Log.i(TAG, "dir is exist....: " + file.getPath());
-                    return;
-                }
-                file.mkdirs();
-                Log.i(TAG, "make dir" + file.getPath());
-            } catch (Exception e2) {
-                e = e2;
-                Log.i(TAG, String.valueOf(e));
-            }
-        } catch (Exception e3) {
-            e = e3;
-            Log.i(TAG, String.valueOf(e));
-        }
+        Util.closeKeyboard(this.editInterval, this);
     }
 
     // EditText enable or disable
@@ -377,29 +295,23 @@ public class MainActivity extends AppCompatActivity {
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                //Action for 'yes' button
-                if(getTtoS(mname_edit).equals("") || mname_edit.length() <= 4
-                        || !getTtoS(mname_edit).substring(mname_edit.length() - 4, mname_edit.length()).equals(".txt")) {
-                    mname_edit.setText(mOldName);
-                    Toast.makeText(MainActivity.this, "There is no file name\nor\nDoesn't include .txt at end of file name", Toast.LENGTH_LONG).show();
-                    return;
-                }
-                stringFileNewName = mname_edit.getText().toString();
-                writeTxtToFile(showLog.getText().toString(), logSavePath, stringFileNewName);
-                Toast.makeText(MainActivity.this, "LOG : " + logSavePath + stringFileNewName, Toast.LENGTH_LONG).show();
-            }
-        }).setNegativeButton("NO", new dialogDismiss()).show();
+                        //Action for 'yes' button
+                        if(Util.getTtoS(mname_edit).equals("") || mname_edit.length() <= 4
+                                || !Util.getTtoS(mname_edit).substring(mname_edit.length() - 4, mname_edit.length()).equals(".txt")) {
+                            mname_edit.setText(mOldName);
+                            Toast.makeText(MainActivity.this, "There is no file name\nor\nDoesn't include .txt at end of file name", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        stringFileNewName = mname_edit.getText().toString();
+                        Util.writeTxtToFile(showLog.getText().toString(), logSavePath, stringFileNewName);
+                        Toast.makeText(MainActivity.this, "LOG : " + logSavePath + stringFileNewName, Toast.LENGTH_LONG).show();
+                    }
+                }).setNegativeButton("NO", new dialogDismiss()).show();
     }
 
-    // convert EditText's texts
-    public String getTtoS(EditText et){
-        return et.getText().toString();
-    }
-    public int getTtoI(EditText et){
-        return Integer.parseInt(et.getText().toString());
-    }
 
-    // dialogDismiss
+
+    // dialog dismiss
     class dialogDismiss implements DialogInterface.OnClickListener{
         @Override
         public void onClick(DialogInterface dialog, int which) {
@@ -413,9 +325,9 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onClick(DialogInterface dialog, int which) {
             clearLogAndBuffer(showLog, sbWritePingLog);
+            //dialog.dismiss();
         }
     }
-
     public void clearLogAndBuffer(TextView tv, StringBuffer stringBuffer){
         if(tv != null)
             tv.setText("");
@@ -423,11 +335,20 @@ public class MainActivity extends AppCompatActivity {
             stringBuffer.delete(0, stringBuffer.length());
     }
 
-    // get device information
-    public static String getSystemVersion() { return Build.VERSION.RELEASE; }
-    public static String getSystemModel() { return Build.MODEL; }
-    public static String getDeviceBrand() { return Build.BRAND; }
 
+    private void StartService(){
+//        if(!MainService.Run){
+        Intent intent = new Intent(this, MainService.class);
+        startService(intent);
+//        }
+    }
+
+    private void StopService(){
+//        if (MainService.Run) {
+        Intent intent = new Intent(this, MainService.class);
+        stopService(intent);
+//        }
+    }
 }
 
 // 180921_123202
